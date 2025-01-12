@@ -2,7 +2,9 @@
 """
 SubEcho 1.0
 ===========
-A cross-platform subdomain enumeration and WAF detection tool. It queries multiple data sources (crt.sh, SecurityTrails, RapidDNS, WebArchive, AlienVault OTX, HackerTarget, and urlscan.io) to discover subdomains, checks if they’re down, and attempts to detect if a subdomain is behind a known WAF (Web Application Firewall)
+A cross-platform subdomain enumeration and WAF detection tool that fetches subdomains
+from multiple data sources (crt.sh, SecurityTrails, RapidDNS, WebArchive, AlienVault OTX, 
+HackerTarget, urlscan.io) and attempts to detect if a domain is behind a WAF.
 
 Usage:
 ------
@@ -19,7 +21,7 @@ Features:
 
 Author:
 -------
-  John Holt
+  John Holt (with ChatGPT enhancements)
 
 """
 import argparse
@@ -29,7 +31,7 @@ import re
 import socket
 from datetime import datetime
 from io import StringIO
-from typing import Optional, List, Set, Tuple, Union
+from typing import Optional, List, Set, Tuple
 
 import aiohttp
 from rich.console import Console
@@ -138,7 +140,7 @@ async def display_banner() -> None:
 ░ ░▒  ░ ░░░▒░ ░ ░ ▒░▒   ░  ░ ░  ░  ░  ▒    ▒ ░▒░ ░  ░ ▒ ▒░ 
 ░  ░  ░   ░░░ ░ ░  ░    ░    ░   ░         ░  ░░ ░░ ░ ░ ▒  
       ░     ░      ░         ░  ░░ ░       ░  ░  ░    ░ ░  
-                        ░        ░
+                        ░        ░                         
 """
     panel = Panel(
         Text(ascii_art, style="red", justify="center"),
@@ -376,7 +378,7 @@ async def detect_waf(
     return None
 
 # ------------------------------------------------------------------------------
-# Domain Status Checking
+# Domain Status Checking (UPDATED to catch UnicodeError)
 # ------------------------------------------------------------------------------
 async def check_domain_status(
     domain: str,
@@ -396,6 +398,11 @@ async def check_domain_status(
         # If resolution is successful, domain is "Online"
         return (domain, "Online", ip_addr, None)
     except socket.gaierror:
+        return (domain, "Offline", None, None)
+    except UnicodeError as ue:
+        # Catch the "label empty or too long" IDNA error
+        if verbose:
+            logger.warning(f"Skipping invalid domain [{domain}] due to: {ue}")
         return (domain, "Offline", None, None)
 
 # ------------------------------------------------------------------------------
@@ -532,7 +539,7 @@ async def main() -> None:
         prog="SubEcho 1.0",
         description=(
             "SubEcho 1.0:\n"
-            "A cross-platform subdomain enumeration and WAF detection tool."
+            "A subdomain enumeration tool with real-time WAF detection."
         ),
         epilog=(
             "Example Usage:\n"
@@ -597,7 +604,6 @@ async def main() -> None:
             main_domain_status = await check_domain_status(args.domain, session, args.verbose)
             subdomain_tasks = [check_domain_status(sd, session, args.verbose) for sd in sorted_subdomains]
 
-            # We gather results but use as_completed to process in real-time if we like
             status_results = [main_domain_status]
             for coro in asyncio.as_completed(subdomain_tasks):
                 status_results.append(await coro)
@@ -624,7 +630,10 @@ async def main() -> None:
     # Ensure main domain info is updated with WAF if it's online
     main_domain_list = list(main_domain_status)
     if main_domain_status[1] == "Online":
-        possibly_updated = next((item for item in updated_online if item[0] == main_domain_status[0]), main_domain_status)
+        possibly_updated = next(
+            (item for item in updated_online if item[0] == main_domain_status[0]),
+            main_domain_status
+        )
         main_domain_list = list(possibly_updated)
     main_domain_status = tuple(main_domain_list)
 
@@ -646,8 +655,8 @@ async def main() -> None:
         logs = log_stream.getvalue()
         filtered_lines = []
         for line in logs.splitlines():
+            # Skip some repeated or less-helpful lines
             if any(x in line for x in ["is behind WAF", "WAF detection error", "Timeout during WAF detection"]):
-                # We skip some repeated messages to keep logs clean 
                 continue
             filtered_lines.append(line)
 
