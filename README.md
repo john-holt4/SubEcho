@@ -11,7 +11,7 @@
 * Enumerates subdomains from various well-nown data sources
 * Distinguishes between *online* and *offline* subdomains
 * Scans for *WAF* signatures in headers and cookies
-* Saves results to a *timestamped file** for easy reference
+* Saves results to a *timestamped file* for easy reference
 * Provides optional *verbose logs* for troubleshooting
 
 ## Requirements
@@ -90,6 +90,6 @@ python subecho.py -d example.com -k YOUR_API_KEY
 ----
 
 ## License
-This repository is licensed under [MIT License](https://github.com/johnholt4/SubEcho/blob/master/LICENSE). See `LICENSE` for details.
+This repository is licensed under [MIT License](https://github.com/john-holt4/SubEcho/blob/main/LICENSE). See `LICENSE` for details.
 
 Made with :heart: and Python
