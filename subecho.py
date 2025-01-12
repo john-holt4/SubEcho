@@ -35,7 +35,7 @@ from typing import Optional, List, Set, Tuple
 import aiohttp
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -581,25 +581,48 @@ async def main() -> None:
 
     # 1) Subdomain enumeration
     async with aiohttp.ClientSession() as session:
+        enumerating_tasks = [
+            fetch_crtsh_subdomains(session, args.domain, args.verbose),
+            fetch_securitytrails_subdomains(session, args.domain, args.apikey, args.verbose),
+            fetch_rapiddns_subdomains(session, args.domain, args.verbose),
+            fetch_webarchive_subdomains(session, args.domain, args.verbose),
+            fetch_alienvault_subdomains(session, args.domain, args.verbose),
+            fetch_hackertarget_subdomains(session, args.domain, args.verbose),
+            fetch_urlscan_subdomains(session, args.domain, args.verbose),
+        ]
+
+        fetcher_names = [
+            "crt.sh",
+            "SecurityTrails",
+            "RapidDNS",
+            "WebArchive",
+            "AlienVault OTX",
+            "HackerTarget",
+            "urlscan.io"
+        ]
+
         with Progress(
             SpinnerColumn(spinner_name="dots12"),
-            TextColumn("[bold bright_cyan]{task.description}[/bold bright_cyan]"),
+            TextColumn("[bold bright_cyan]Enumerating subdomains from {task.description}[/bold bright_cyan]"),
+            BarColumn(),
+            "{task.percentage:>3.0f}%",
             transient=True,
             expand=True
         ) as progress:
-            progress.add_task("Enumerating subdomains...")
-            tasks = [
-                fetch_crtsh_subdomains(session, args.domain, args.verbose),
-                fetch_securitytrails_subdomains(session, args.domain, args.apikey, args.verbose),
-                fetch_rapiddns_subdomains(session, args.domain, args.verbose),
-                fetch_webarchive_subdomains(session, args.domain, args.verbose),
-                fetch_alienvault_subdomains(session, args.domain, args.verbose),
-                fetch_hackertarget_subdomains(session, args.domain, args.verbose),
-                fetch_urlscan_subdomains(session, args.domain, args.verbose),
-            ]
-            results = await asyncio.gather(*tasks)
-            for sub_list in results:
-                all_subdomains.update(sub_list)
+            task = progress.add_task(
+                f"{fetcher_names[0]}", total=len(enumerating_tasks)
+            )
+            results = []
+            for i, coro in enumerate(asyncio.as_completed(enumerating_tasks)):
+                sub_list = await coro
+                results.append(sub_list)
+                # Update the description with the current fetcher name
+                progress.update(task, description=f"{fetcher_names[i]}")
+                progress.update(task, advance=1)
+
+            # Update the aggregated subdomains set
+            for r_ in results:
+                all_subdomains.update(r_)
 
     # Remove the main domain from subdomains if present
     all_subdomains.discard(args.domain)
