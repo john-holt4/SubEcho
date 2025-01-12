@@ -35,7 +35,6 @@ pip install -r requirements.txt
  
 3.  *(Optional) SecurityTrails API key*:
 If you have a [SecurityTrails](https://securitytrails.com/) account, pass the API key via `-k YOUR_API_KEY` to *unlock deeper subdomain discovery*. Otherwise, that source is skipped.
----
 
 ## Usage
 Run the tool using Python:
@@ -65,7 +64,6 @@ python subecho.py -d example.com -v
 ```bash
 python subecho.py -d example.com -k YOUR_API_KEY
 ```
----
 
 ## How It Works
 1.  **Banner & Validation**
@@ -79,7 +77,6 @@ python subecho.py -d example.com -k YOUR_API_KEY
 5.  **Save & Display Results**
 * Outputs a Rich-formatted table in the console
 * Saves results to a `.txt` file with a timestamp (e.g. `example.com-20250113-120000.txt`)
-----
 
 ## Contributing
 1.  **Fork** this project
@@ -87,7 +84,6 @@ python subecho.py -d example.com -k YOUR_API_KEY
 3. Commit your changes: `git commit -am 'Add new feature'`
 4. Push to the branch: `git push origin my-new-feature`
 5. Create a new **Pull Request** on GitHub
-----
 
 ## License
 This repository is licensed under [MIT License](https://github.com/john-holt4/SubEcho/blob/main/LICENSE). See `LICENSE` for details.
