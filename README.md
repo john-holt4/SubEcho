@@ -5,7 +5,7 @@
 ## Overview
 ***SubEcho*** is a cross-platform subdomain enumeration and WAF detection tool written in Python. It queries multiple data sources (crt.sh, SecurityTrails, RapidDNS, WebArchive, AlienVault OTX, HackerTarget, and urlscan.io) to discover subdomains, checks if they’re down, and attempts to detect if a subdomain is behind a known WAF (Web Application Firewall).
 
-> **Author***: John Holt
+> **Author**: John Holt
 
 ## Features
 * Enumerates subdomains from various well-nown data sources
