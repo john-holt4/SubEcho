@@ -22,7 +22,6 @@ Features:
 Author:
 -------
   John Holt (with ChatGPT enhancements)
-
 """
 import argparse
 import asyncio
@@ -111,15 +110,27 @@ def is_valid_subdomain(sd: str) -> bool:
 
 def parse_subdomains(data: list) -> List[str]:
     """
-    Parse subdomains from data returned by crt.sh queries.
-    Removes wildcards and ensures the domain is valid according to the regex.
+    Parse subdomains from data returned by crt.sh queries (or other sources).
+    - Removes wildcards (e.g., *.example.com)
+    - Skips anything that starts with '.' (e.g., .enterprise.example.com)
+    - Validates the remaining name to ensure it follows domain naming rules.
     """
     results = set()
     for entry in data:
         if 'name_value' in entry:
             for nm in entry['name_value'].split(','):
                 candidate = nm.strip()
-                if not candidate.startswith('*') and is_valid_subdomain(candidate):
+                
+                # Skip wildcard subdomains like "*.example.com"
+                if candidate.startswith('*'):
+                    continue
+                
+                # Skip subdomains that begin with '.'
+                if candidate.startswith('.'):
+                    continue
+                
+                # Finally, check if it matches our domain regex
+                if is_valid_subdomain(candidate):
                     results.add(candidate)
     return sorted(results)
 
@@ -154,6 +165,7 @@ async def display_banner() -> None:
 
 # ------------------------------------------------------------------------------
 # Subdomain Fetchers
+# (unchanged fetch_*_subdomains functions)
 # ------------------------------------------------------------------------------
 async def fetch_crtsh_subdomains(
     session: aiohttp.ClientSession,
@@ -214,6 +226,7 @@ async def fetch_securitytrails_subdomains(
     except Exception as e:
         if verbose:
             logger.error(f"[red]SecurityTrails fetch failed: {e}[/red]")
+    # Convert them to FQDN with domain
     return [f"{s}.{domain}" for s in subs]
 
 async def fetch_rapiddns_subdomains(
@@ -378,7 +391,7 @@ async def detect_waf(
     return None
 
 # ------------------------------------------------------------------------------
-# Domain Status Checking (UPDATED to catch UnicodeError)
+# Domain Status Checking (with UnicodeError Handling)
 # ------------------------------------------------------------------------------
 async def check_domain_status(
     domain: str,
@@ -590,6 +603,9 @@ async def main() -> None:
 
     # Remove the main domain from subdomains if present
     all_subdomains.discard(args.domain)
+    
+    # Filter out any subdomains that start with a dot
+    all_subdomains = {d for d in all_subdomains if not d.startswith('.')}
 
     # 2) Check domain statuses (online/offline)
     sorted_subdomains = sorted(all_subdomains)
