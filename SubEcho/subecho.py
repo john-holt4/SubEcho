@@ -23,10 +23,11 @@ Author:
 -------
   John Holt
 """
+
 import argparse
 import asyncio
 import logging
-import os  # Added for directory management
+import os
 import re
 import socket
 from datetime import datetime
@@ -39,11 +40,16 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 from rich.text import Text
+from rich.traceback import install
+
+# Install rich traceback for better exception formatting
+install(show_locals=True)
 
 # ------------------------------------------------------------------------------
 # Constants
 # ------------------------------------------------------------------------------
 VERSION = "BETA"  # Define version in one variable
+OUTPUT_DIR = "output"
 
 MAX_RETRIES = 3
 DOMAIN_REGEX = r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$'
@@ -123,15 +129,12 @@ def parse_subdomains(data: list) -> List[str]:
         if 'name_value' in entry:
             for nm in entry['name_value'].split(','):
                 candidate = nm.strip()
-                
                 # Skip wildcard subdomains like "*.example.com"
                 if candidate.startswith('*'):
                     continue
-                
                 # Skip subdomains that begin with '.' 
                 if candidate.startswith('.'):
                     continue
-                
                 # Finally, check if it matches our domain regex
                 if is_valid_subdomain(candidate):
                     results.add(candidate)
@@ -158,7 +161,7 @@ async def display_banner() -> None:
 """
     panel = Panel(
         Text(ascii_art, style="red", justify="center"),
-        title=f"[bright_magenta]Version {VERSION}[/]",  # Use VERSION variable
+        title=f"[bright_magenta]Version {VERSION}[/]",
         subtitle="[bold white]Created by John Holt[/]",
         border_style="bright_magenta",
         padding=0
@@ -170,6 +173,7 @@ async def display_banner() -> None:
 # Subdomain Fetchers
 # (unchanged fetch_*_subdomains functions)
 # ------------------------------------------------------------------------------
+
 async def fetch_crtsh_subdomains(
     session: aiohttp.ClientSession,
     domain: str,
@@ -383,7 +387,6 @@ async def detect_waf(
                             if verbose:
                                 logger.info(f"[bright_cyan]{domain} is behind WAF: {waf_name}[/]")
                             return waf_name
-            # If we succeed with no hits, there's likely no WAF (or at least not detected).
             return None
         except asyncio.TimeoutError:
             if verbose:
@@ -411,12 +414,10 @@ async def check_domain_status(
     loop = asyncio.get_event_loop()
     try:
         ip_addr = await loop.run_in_executor(None, socket.gethostbyname, domain)
-        # If resolution is successful, domain is "Online"
         return (domain, "Online", ip_addr, None)
     except socket.gaierror:
         return (domain, "Offline", None, None)
     except UnicodeError as ue:
-        # Catch the "label empty or too long" IDNA error
         if verbose:
             logger.warning(f"Skipping invalid domain [{domain}] due to: {ue}")
         return (domain, "Offline", None, None)
@@ -436,9 +437,8 @@ async def save_results_to_file(
     Returns the filename.
     """
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_dir = "output"
-    os.makedirs(output_dir, exist_ok=True)  # Ensure output directory exists
-    filename = os.path.join(output_dir, f"{domain}-{timestamp}.txt")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)  # Ensure output directory exists
+    filename = os.path.join(OUTPUT_DIR, f"{domain}-{timestamp}.txt")
 
     with open(filename, 'w', encoding='utf-8') as f:
         md_domain, md_status, md_ip, md_waf = main_domain_stats
@@ -554,7 +554,7 @@ async def main() -> None:
     await display_banner()
 
     parser = argparse.ArgumentParser(
-        prog=f"SubEcho {VERSION}",  # Use VERSION variable
+        prog=f"SubEcho {VERSION}",
         description=(
             f"SubEcho {VERSION}:\n"
             "A subdomain enumeration tool with real-time WAF detection."
@@ -614,18 +614,14 @@ async def main() -> None:
             transient=True,
             expand=True
         ) as progress:
-            task = progress.add_task(
-                f"{fetcher_names[0]}", total=len(enumerating_tasks)
-            )
+            task = progress.add_task(f"{fetcher_names[0]}", total=len(enumerating_tasks))
             results = []
             for i, coro in enumerate(asyncio.as_completed(enumerating_tasks)):
                 sub_list = await coro
                 results.append(sub_list)
-                # Update the description with the current fetcher name
                 progress.update(task, description=f"{fetcher_names[i]}")
                 progress.update(task, advance=1)
 
-            # Update the aggregated subdomains set
             for r_ in results:
                 all_subdomains.update(r_)
 
@@ -663,7 +659,8 @@ async def main() -> None:
 
     # 3) WAF detection for online domains
     async with aiohttp.ClientSession() as session:
-        async def detect_waf_with_domain(item):
+        async def detect_waf_with_domain(item: Tuple[str, str, Optional[str], Optional[str]]
+        ) -> Tuple[str, str, Optional[str], Optional[str]]:
             dom, st, ip, _ = item
             w = await detect_waf(session, dom, args.verbose)
             return (dom, st, ip, w)
@@ -714,7 +711,6 @@ async def main() -> None:
         logs = log_stream.getvalue()
         filtered_lines = []
         for line in logs.splitlines():
-            # Skip some repeated or less-helpful lines
             if any(x in line for x in ["is behind WAF", "WAF detection error", "Timeout during WAF detection"]):
                 continue
             filtered_lines.append(line)
