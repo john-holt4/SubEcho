@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SubEcho 1.0
+SubEcho
 ===========
 A cross-platform subdomain enumeration and WAF detection tool that fetches subdomains
 from multiple data sources (crt.sh, SecurityTrails, RapidDNS, WebArchive, AlienVault OTX, 
@@ -26,6 +26,7 @@ Author:
 import argparse
 import asyncio
 import logging
+import os  # Added for directory management
 import re
 import socket
 from datetime import datetime
@@ -40,20 +41,10 @@ from rich.table import Table
 from rich.text import Text
 
 # ------------------------------------------------------------------------------
-# Logging Configuration
-# ------------------------------------------------------------------------------
-log_stream = StringIO()
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    handlers=[logging.StreamHandler(log_stream)]
-)
-logger = logging.getLogger(__name__)
-
-# ------------------------------------------------------------------------------
 # Constants
 # ------------------------------------------------------------------------------
+VERSION = "BETA"  # Define version in one variable
+
 MAX_RETRIES = 3
 DOMAIN_REGEX = r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$'
 
@@ -89,6 +80,18 @@ WAF_SIGNATURES = {
     "WebARX": ["x-webarx", "x-waf-status"],
     "Wordfence": ["X-Wordfence-Blocked", "wfwaf-authcookie-"],
 }
+
+# ------------------------------------------------------------------------------
+# Logging Configuration
+# ------------------------------------------------------------------------------
+log_stream = StringIO()
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+    handlers=[logging.StreamHandler(log_stream)]
+)
+logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------------------
 # Helpers / Validators
@@ -155,7 +158,7 @@ async def display_banner() -> None:
 """
     panel = Panel(
         Text(ascii_art, style="red", justify="center"),
-        title="[bright_magenta]Version 1.0[/]",
+        title=f"[bright_magenta]Version {VERSION}[/]",  # Use VERSION variable
         subtitle="[bold white]Created by John Holt[/]",
         border_style="bright_magenta",
         padding=0
@@ -433,7 +436,9 @@ async def save_results_to_file(
     Returns the filename.
     """
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    filename = f"{domain}-{timestamp}.txt"
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)  # Ensure output directory exists
+    filename = os.path.join(output_dir, f"{domain}-{timestamp}.txt")
 
     with open(filename, 'w', encoding='utf-8') as f:
         md_domain, md_status, md_ip, md_waf = main_domain_stats
@@ -549,9 +554,9 @@ async def main() -> None:
     await display_banner()
 
     parser = argparse.ArgumentParser(
-        prog="SubEcho 1.0",
+        prog=f"SubEcho {VERSION}",  # Use VERSION variable
         description=(
-            "SubEcho 1.0:\n"
+            f"SubEcho {VERSION}:\n"
             "A subdomain enumeration tool with real-time WAF detection."
         ),
         epilog=(
