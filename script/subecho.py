@@ -21,7 +21,7 @@ Features:
 
 Author:
 -------
-  John Holt (with ChatGPT enhancements)
+  John Holt
 """
 import argparse
 import asyncio
