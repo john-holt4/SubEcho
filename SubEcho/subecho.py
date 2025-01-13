@@ -128,7 +128,7 @@ def parse_subdomains(data: list) -> List[str]:
                 if candidate.startswith('*'):
                     continue
                 
-                # Skip subdomains that begin with '.'
+                # Skip subdomains that begin with '.' 
                 if candidate.startswith('.'):
                     continue
                 
@@ -608,7 +608,7 @@ async def main() -> None:
 
         with Progress(
             SpinnerColumn(spinner_name="dots12"),
-            TextColumn("[bold bright_cyan]Enumerating subdomains from {task.description}[/bold bright_cyan]"),
+            TextColumn("[bold bright_cyan]Enumerating subdomains from {task.description}...[/bold bright_cyan]"),
             BarColumn(),
             "{task.percentage:>3.0f}%",
             transient=True,
@@ -639,37 +639,52 @@ async def main() -> None:
     sorted_subdomains = sorted(all_subdomains)
     async with aiohttp.ClientSession() as session:
         with Progress(
-            SpinnerColumn(spinner_name="simpleDotsScrolling"),
-            TextColumn("[bold magenta]{task.description}[/bold magenta]"),
+            SpinnerColumn(spinner_name="dots12"),
+            TextColumn("[bold bright_cyan]Checking subdomains status...[/bold bright_cyan]"),
+            BarColumn(),
+            "{task.percentage:>3.0f}%",
             transient=True,
             expand=True
         ) as progress:
-            progress.add_task("Checking subdomains status...")
+            total_checks = len(sorted_subdomains) + 1  # +1 for main domain
+            status_task = progress.add_task("Status checking", total=total_checks)
+            
             main_domain_status = await check_domain_status(args.domain, session, args.verbose)
-            subdomain_tasks = [check_domain_status(sd, session, args.verbose) for sd in sorted_subdomains]
+            progress.advance(status_task)
 
+            subdomain_tasks = [check_domain_status(sd, session, args.verbose) for sd in sorted_subdomains]
             status_results = [main_domain_status]
             for coro in asyncio.as_completed(subdomain_tasks):
                 status_results.append(await coro)
+                progress.advance(status_task)
 
     online_domains = [r for r in status_results if r[1] == "Online"]
     offline_domains = [r for r in status_results if r[1] == "Offline"]
 
     # 3) WAF detection for online domains
     async with aiohttp.ClientSession() as session:
+        async def detect_waf_with_domain(item):
+            dom, st, ip, _ = item
+            w = await detect_waf(session, dom, args.verbose)
+            return (dom, st, ip, w)
+
         with Progress(
-            SpinnerColumn(spinner_name="line"),
-            TextColumn("[bold green]{task.description}[/bold green]"),
+            SpinnerColumn(spinner_name="dots12"),
+            TextColumn("[bold bright_cyan]Detecting WAF...[/bold bright_cyan]"),
+            BarColumn(),
+            "{task.percentage:>3.0f}%",
             transient=True,
             expand=True
         ) as progress:
-            progress.add_task("Detecting WAF...")
-            waf_coros = [detect_waf(session, dom, args.verbose) for (dom, _, _, _) in online_domains]
-            waf_results = await asyncio.gather(*waf_coros)
-
+            total_waf = len(online_domains)
+            waf_task = progress.add_task("WAF detection", total=total_waf)
+            waf_coros = [detect_waf_with_domain(item) for item in online_domains]
+            
             updated_online = []
-            for ((dom, st, ip, _), w_detected) in zip(online_domains, waf_results):
-                updated_online.append((dom, st, ip, w_detected))
+            for coro in asyncio.as_completed(waf_coros):
+                result = await coro
+                updated_online.append(result)
+                progress.advance(waf_task)
 
     # Ensure main domain info is updated with WAF if it's online
     main_domain_list = list(main_domain_status)
