@@ -48,7 +48,7 @@ install(show_locals=True)
 # ------------------------------------------------------------------------------
 # Constants
 # ------------------------------------------------------------------------------
-VERSION = "BETA"  # Define version in one variable
+VERSION = "1.0"  # Define version in one variable
 OUTPUT_DIR = "output"
 
 MAX_RETRIES = 3
